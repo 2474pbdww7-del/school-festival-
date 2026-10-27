@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Festival Menu</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fff8ee;--card:#fff;--ink:#2b1d12;--mut:#7a6857;--acc:#c8501e;--on:#fff;--line:#ecdcc7;--pic:#fbe9cf;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1511;--card:#2a2019;--ink:#f6eadb;--mut:#b7a390;--acc:#e8703a;--on:#1c1511;--line:#43332a;--pic:#3a2c22}}
+:root[data-theme="dark"]{--bg:#1c1511;--card:#2a2019;--ink:#f6eadb;--mut:#b7a390;--acc:#e8703a;--on:#1c1511;--line:#43332a;--pic:#3a2c22}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,"Noto Sans JP","Noto Sans Devanagari","Noto Sans Myanmar",sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:24px;margin:8px 0 2px}h2{font-size:18px;margin:24px 0 8px}
+.sub{color:var(--mut);margin:0 0 12px}
+.langs{display:flex;gap:6px;margin-bottom:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;overflow:hidden}
+.pic{background:var(--pic);border-radius:10px;margin-bottom:10px;display:flex;justify-content:center}
+.pic svg{width:100%;max-width:260px;height:150px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.my{color:var(--mut);font-size:14px}.price{font-weight:700}
+.chips{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:20px;padding:6px 12px;font:inherit;cursor:pointer}
+.chip.on{background:var(--acc);color:var(--on);border-color:var(--acc)}
+button.main{width:100%;background:var(--acc);color:var(--on);border:0;border-radius:12px;padding:13px;font:inherit;font-weight:700;cursor:pointer}
+button.ghost{width:100%;background:transparent;color:var(--acc);border:1px solid var(--acc);border-radius:12px;padding:12px;font:inherit;font-weight:700;margin-top:8px;cursor:pointer}
+.qty{display:flex;align-items:center;gap:10px}
+.qty button{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:18px;cursor:pointer}
+input,textarea{width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px;font:inherit;margin-top:8px}
+.total{font-size:20px;font-weight:700}
+.slip{text-align:center}.num{font-size:56px;font-weight:700;color:var(--acc);margin:4px 0}
+.slip ul{list-style:none;padding:0;text-align:left;margin:12px 0}.slip li{padding:6px 0;border-bottom:1px dashed var(--line)}
+[hidden]{display:none!important}
+</style></head><body><main>
+<div class="langs" id="langs"></div>
+<div id="shop">
+<h1>🍜 <span data-t="title"></span></h1>
+<p class="sub" data-t="sub"></p>
+<div id="menu"></div>
+<h2 data-t="yours"></h2>
+<div class="card" id="cart"></div>
+<div id="form" hidden>
+<input id="who" data-p="name" maxlength="40">
+<textarea id="note" rows="2" data-p="notePh" maxlength="120"></textarea>
+<button class="main" id="place" style="margin-top:12px" data-t="place"></button>
+</div>
+</div>
+<div id="done" hidden class="card slip">
+<div class="my" data-t="orderNo"></div><div class="num" id="num"></div>
+<div id="slipwho" style="font-weight:700"></div>
+<ul id="slipitems"></ul>
+<div class="total" id="sliptotal"></div>
+<p class="sub" data-t="show"></p>
+<a id="sms" hidden><button class="ghost" data-t="sms"></button></a>
+<button class="ghost" id="again" data-t="again"></button>
+</div>
+</main>
+<script>
+// ===== EDIT THESE =====
+const CURRENCY = "¥";
+const STAFF_PHONE = ""; // e.g. "+8190XXXXXXXX" enables the SMS button
+// Paste your deployed Google Apps Script Web App /exec URL here.
+const SHEETS_WEB_APP_URL = "https://script.google.com/a/macros/oic-ok.ac.jp/s/AKfycbxbWYVQd25FqDBtdX9nTaUHt5Y1UoM8MF4-0AFQQ6WqaOYIuNZMaoEEoaP2eGyOWnI/exec";
+const PRICES = {nan:300, vc:200};
+// ======================
+const LANGS = [["en","English"],["ja","日本語"],["hi","हिन्दी"]];
+const T = {
+ en:{title:"Festival Menu",sub:"Pick your items, then tap “Place order”.",yours:"Your order",empty:"Nothing yet. Add something above 👆",add:"Add to order",total:"Total",name:"Your name / class",notePh:"Note (optional)",place:"Place order",orderNo:"Your order number",show:"Show this screen at the counter and pay there. We’ll call your number!",sms:"Also send order by SMS",again:"New order",note:"Note"},
+ ja:{title:"メニュー",sub:"商品を選んで「注文する」を押してください。",yours:"ご注文内容",empty:"まだ何も入っていません 👆",add:"追加する",total:"合計",name:"お名前・クラス",notePh:"メモ（任意）",place:"注文する",orderNo:"注文番号",show:"この画面をカウンターで見せて、お支払いください。番号をお呼びします！",sms:"SMSでも注文を送る",again:"新しい注文",note:"メモ"},
+ hi:{title:"फेस्टिवल मेन्यू",sub:"अपनी पसंद चुनें, फिर “ऑर्डर करें” दबाएँ।",yours:"आपका ऑर्डर",empty:"अभी कुछ नहीं। ऊपर से जोड़ें 👆",add:"ऑर्डर में जोड़ें",total:"कुल",name:"आपका नाम / कक्षा",notePh:"नोट (वैकल्पिक)",place:"ऑर्डर करें",orderNo:"आपका ऑर्डर नंबर",show:"यह स्क्रीन काउंटर पर दिखाएँ और वहीं भुगतान करें। हम आपका नंबर बुलाएँगे!",sms:"SMS से भी ऑर्डर भेजें",again:"नया ऑर्डर",note:"नोट"}
+};
+const MENU = [
+ {id:"nan",my:"နန်းကြီးသုတ်",opts:["mild","med","hot"],
+  name:{en:"Nan Gyi Thoke",ja:"ナンジー・トゥ",hi:"नान ज्यी थोके"},
+  desc:{en:"Thick rice noodle salad",ja:"ミャンマー風の太い米麺サラダ",hi:"मोटी चावल की नूडल्स का सलाद"}},
+ {id:"vc",my:"ဗီယက်နမ်ကော်ဖီ",opts:["hot2"],
+  name:{en:"Vietnamese Coffee",ja:"ベトナムコーヒー",hi:"वियतनामी कॉफ़ी"},
+  desc:{en:"Strong coffee with condensed milk",ja:"コンデンスミルク入りの濃いコーヒー",hi:"कंडेंस्ड मिल्क वाली कड़क कॉफ़ी"}}
+];
+const OPT = {mild:{en:"Mild",ja:"辛さ控えめ",hi:"हल्का"},med:{en:"Medium",ja:"普通",hi:"मध्यम"},hot:{en:"Spicy",ja:"辛い",hi:"तीखा"},iced:{en:"Iced",ja:"アイス",hi:"ठंडी"},hot2:{en:"Hot",ja:"ホット",hi:"गरम"}};
+const PIC = {
+ nan:'<svg viewBox="0 0 160 120" role="img" aria-label="Noodle salad"><ellipse cx="80" cy="104" rx="52" ry="6" fill="#000" opacity=".12"/><path d="M20 56 Q80 130 140 56Z" fill="#c8501e"/><path d="M20 56 Q80 100 140 56Z" fill="#e0662f" opacity=".6"/><ellipse cx="80" cy="56" rx="60" ry="13" fill="#f6dfa5"/><path d="M36 54q20-8 40 0t40 0M42 59q20-8 38 0t36 0M50 50q16-6 30 0t30 0" stroke="#e3c070" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="58" cy="50" r="6" fill="#d93b2b"/><circle cx="100" cy="52" r="5" fill="#d93b2b"/><g fill="#4f9a3c"><circle cx="76" cy="47" r="4"/><circle cx="88" cy="55" r="3.5"/><circle cx="68" cy="58" r="3"/></g><ellipse cx="108" cy="44" rx="11" ry="7" fill="#fff"/><circle cx="108" cy="44" r="4" fill="#f5b800"/><path d="M96 14l30 38M106 12l30 38" stroke="#8a5a2b" stroke-width="3" stroke-linecap="round"/></svg>',
+ vc:'<svg viewBox="0 0 160 120" role="img" aria-label="Vietnamese coffee"><ellipse cx="80" cy="108" rx="40" ry="5" fill="#000" opacity=".12"/><path d="M48 44h64l-7 62H55Z" fill="#4a2a14"/><path d="M50 76h60l-5 30H55Z" fill="#f6ecd6"/><path d="M48 44h64l-1.5 13h-61Z" fill="#fff" opacity=".15"/><rect x="62" y="50" width="16" height="16" rx="3" fill="#fff" opacity=".35" transform="rotate(-12 70 58)"/><rect x="86" y="58" width="14" height="14" rx="3" fill="#fff" opacity=".3" transform="rotate(10 93 65)"/><rect x="42" y="30" width="76" height="9" rx="3" fill="#b9bec4"/><path d="M52 14h56l4 16H48Z" fill="#cfd3d8"/><rect x="72" y="8" width="16" height="6" rx="3" fill="#9aa0a6"/><path d="M80 39v6" stroke="#4a2a14" stroke-width="3"/></svg>'
+};
+const $ = id => document.getElementById(id);
+let lang = (navigator.language||"en").slice(0,2); if(!T[lang]) lang = "en";
+const pick = {}; MENU.forEach(m => pick[m.id] = m.opts[0]);
+let cart = [], last = null; // cart: {id,opt,qty}
+const fmt = n => CURRENCY + n.toLocaleString();
+const item = id => MENU.find(m => m.id === id);
+const price = l => PRICES[l.id] * l.qty;
+const total = () => cart.reduce((s,l) => s + price(l), 0);
+
+function drawLangs(){
+  const box = $("langs"); box.innerHTML = "";
+  LANGS.forEach(([k,n]) => { const b = document.createElement("button"); b.className = "chip" + (k===lang?" on":""); b.textContent = n; b.onclick = () => { lang = k; render(); }; box.appendChild(b); });
+}
+function drawMenu(){
+  $("menu").innerHTML = "";
+  MENU.forEach(m => {
+    const c = document.createElement("div"); c.className = "card";
+    c.innerHTML = '<div class="pic"></div><div class="row"><div><b></b><div class="my"></div></div><div class="price"></div></div><div class="sub" style="margin:6px 0 0"></div><div class="chips"></div><button class="main"></button>';
+    c.querySelector(".pic").innerHTML = PIC[m.id];
+    c.querySelector("b").textContent = m.name[lang];
+    c.querySelector(".my").textContent = m.my;
+    c.querySelector(".price").textContent = fmt(PRICES[m.id]);
+    c.querySelector(".sub").textContent = m.desc[lang];
+    const chips = c.querySelector(".chips");
+    m.opts.forEach(o => { const b = document.createElement("button"); b.className = "chip" + (pick[m.id]===o?" on":""); b.textContent = OPT[o][lang]; b.onclick = () => { pick[m.id] = o; drawMenu(); }; chips.appendChild(b); });
+    const add = c.querySelector(".main"); add.textContent = T[lang].add;
+    add.onclick = () => { const l = cart.find(x => x.id===m.id && x.opt===pick[m.id]); l ? l.qty++ : cart.push({id:m.id,opt:pick[m.id],qty:1}); drawCart(); };
+    $("menu").appendChild(c);
+  });
+}
+function drawCart(){
+  const box = $("cart"); box.innerHTML = ""; $("form").hidden = !cart.length;
+  if(!cart.length){ const s = document.createElement("span"); s.className = "sub"; s.textContent = T[lang].empty; box.appendChild(s); return; }
+  cart.forEach(l => {
+    const r = document.createElement("div"); r.className = "row"; r.style.marginBottom = "10px";
+    r.innerHTML = '<div><b></b><div class="my"></div></div><div class="qty"><button>−</button><span></span><button>+</button></div>';
+    r.querySelector("b").textContent = item(l.id).name[lang];
+    r.querySelector(".my").textContent = OPT[l.opt][lang] + " · " + fmt(price(l));
+    r.querySelector("span").textContent = l.qty;
+    const [mi,pl] = r.querySelectorAll("button");
+    mi.onclick = () => { l.qty--; cart = cart.filter(x => x.qty>0); drawCart(); };
+    pl.onclick = () => { l.qty++; drawCart(); };
+    box.appendChild(r);
+  });
+  const t = document.createElement("div"); t.className = "row total"; t.innerHTML = "<span></span><span></span>";
+  t.firstChild.textContent = T[lang].total; t.lastChild.textContent = fmt(total()); box.appendChild(t);
+}
+function drawSlip(){
+  if(!last) return;
+  $("num").textContent = last.num; $("slipwho").textContent = last.who;
+  const ul = $("slipitems"); ul.innerHTML = "";
+  last.lines.forEach(l => { const li = document.createElement("li"); li.textContent = l.qty + " × " + item(l.id).name[lang] + " (" + OPT[l.opt][lang] + ")"; ul.appendChild(li); });
+  if(last.note){ const li = document.createElement("li"); li.textContent = T[lang].note + ": " + last.note; ul.appendChild(li); }
+  $("sliptotal").textContent = T[lang].total + ": " + fmt(last.total);
+}
+function render(){
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(e => e.textContent = T[lang][e.dataset.t]);
+  document.querySelectorAll("[data-p]").forEach(e => e.placeholder = T[lang][e.dataset.p]);
+  drawLangs(); drawMenu(); drawCart(); drawSlip();
+}
+$("place").onclick = async () => {
+  if (!cart.length) return;
+  const who = $("who").value.trim();
+  if (!who) {
+    $("who").focus();
+    alert(lang === "ja" ? "お名前を入力してください。" : lang === "hi" ? "कृपया अपना नाम दर्ज करें।" : "Please enter your name or class.");
+    return;
+  }
+  if (!SHEETS_WEB_APP_URL.startsWith("https://script.google.com/macros/s/")) {
+    alert("Setup needed: paste your deployed Google Apps Script Web App URL into SHEETS_WEB_APP_URL in this file.");
+    return;
+  }
+  const orderNumber = "FM-" + Date.now().toString().slice(-8);
+  const orderLines = cart.map(l => ({id:l.id, item:item(l.id).name.en, option:OPT[l.opt].en, quantity:l.qty, unitPrice:PRICES[l.id], lineTotal:price(l)}));
+  const payload = {orderNumber, customerName:who, note:$("note").value.trim(), language:lang, currency:CURRENCY, items:orderLines, total:total()};
+  const placeButton = $("place");
+  placeButton.disabled = true;
+  const originalLabel = placeButton.textContent;
+  placeButton.textContent = lang === "ja" ? "送信中…" : lang === "hi" ? "भेज रहे हैं…" : "Sending order…";
+  try {
+    // no-cors sends the POST but the browser cannot read Apps Script's response.
+    await fetch(SHEETS_WEB_APP_URL, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)});
+    last = {num:orderNumber, who, note:payload.note, lines:cart.map(l=>({...l})), total:total()};
+    let text = "Order " + last.num + (last.who ? " (" + last.who + ")" : "") + "\n";
+    last.lines.forEach(l => text += l.qty + " x " + item(l.id).name.en + " (" + OPT[l.opt].en + ")\n");
+    if(last.note) text += "Note: " + last.note + "\n";
+    text += "Total: " + fmt(last.total);
+    if(STAFF_PHONE){ $("sms").hidden = false; $("sms").href = "sms:" + STAFF_PHONE + "?&body=" + encodeURIComponent(text); }
+    drawSlip();
+    const warning = document.createElement("p");
+    warning.className = "sub order-warning";
+    warning.textContent = lang === "ja" ? "注文リクエストを送信しました。スタッフはGoogle Sheetsで注文が記録されたことを確認してください。" : lang === "hi" ? "ऑर्डर अनुरोध भेज दिया गया। कृपया स्टाफ से Google Sheets में ऑर्डर की पुष्टि करने को कहें।" : "Order request sent. Please ask staff to verify that it appears in Google Sheets.";
+    $("done").insertBefore(warning, $("done").querySelector(".total"));
+    $("shop").hidden = true; $("done").hidden = false; window.scrollTo(0,0);
+  } catch (err) {
+    alert("Could not send the order. Please check your internet connection and try again.");
+  } finally {
+    placeButton.disabled = false; placeButton.textContent = originalLabel;
+  }
+};
+$("again").onclick = () => { cart = []; last = null; $("note").value = ""; $("done").querySelectorAll(".order-warning").forEach(e => e.remove()); $("done").hidden = true; $("shop").hidden = false; drawCart(); };
+render();
+</script></body></html>
